@@ -23,20 +23,20 @@ class ApplyNode(Node):
         super().__init__()
 
     def __str__(self):
-        func_l = isfunction(self.left)
-        func_r = isfunction(self.right)
+        paren_l = isfunction(self.left)
+        paren_r = not isterminal(self.right)
 
         val = ""
-        if func_l:
+        if paren_l:
             val += "("
         val += str(self.left)
-        if func_l:
+        if paren_l:
             val += ")"
         val += " "
-        if func_r:
+        if paren_r:
             val += "("
         val += str(self.right)
-        if func_r:
+        if paren_r:
             val += ")"
         return val
 
