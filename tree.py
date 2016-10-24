@@ -22,6 +22,14 @@ class ApplyNode(Node):
     def __init__(self):
         super().__init__()
 
+    def copy(self, beta):
+        newval = ApplyNode()
+        left = self.left.copy(beta)
+        right = self.right.copy(beta)
+        newval.setLeft(left)
+        newval.setRight(right)
+        return newval
+
     def __str__(self):
         paren_l = isfunction(self.left)
         paren_r = not isterminal(self.right)
@@ -44,6 +52,12 @@ class FunctionNode(Node):
     def __init__(self, name):
         super().__init__()
         self.setLeft(BindingsNode(name))
+
+    def copy(self, beta):
+        new = FunctionNode(self.left.name)
+        new.setLeft(self.left.copy(beta))
+        new.setRight(self.right.copy(beta))
+        return new
 
     def __str__(self):
         return "L" + self.left.name + ". " + str(self.right)
@@ -70,23 +84,35 @@ class BindingsNode(LeafNode):
         assert node.name == self.name
         self.bindings.append(node)
         node.bound = True
+        node.bindingNode = self
 
     def rename(self, newname):
         self.name = newname
         for node in self.bindings:
             node.name = newname
 
+    def copy(self, beta):
+        return beta.copyBindings(self)
+
 class TerminalNode(LeafNode):
     def __init__(self, name):
         super().__init__()
         self.name = name
         self.bound = False
+        self.bindingNode = None
 
     def __str__(self):
         if not self.bound:
             return self.name + "^"
         return self.name
 
+    def copy(self, beta):
+        if self.bound:
+            return beta.copyTerminal(self)
+        else:
+            new = TerminalNode(self.name)
+            beta.try_bind(new)
+            return new
 
 def isterminal(node):
     return isinstance(node, TerminalNode)

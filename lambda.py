@@ -6,6 +6,7 @@
 
 import sys
 import token
+import beta
 
 
 
@@ -19,6 +20,9 @@ def main(instream):
             print("=> ", end='', flush=True)
             data = token.parse(instream)
             if data is not None:
+                print(data)
+                executor = beta.BetaExecuter()
+                data = executor.run(data)
                 print(data)
     except KeyboardInterrupt:
         print()
