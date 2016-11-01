@@ -17,9 +17,13 @@ class Node(object):
         self.right = node
         node.parent = self
 
+    def canInvoke(self):
+        return False
+
     def alphaExec(self, alpha):
         self.left.alphaExec(alpha)
         self.left.alphaExec(alpha)
+
 
 class ApplyNode(Node):
     def __init__(self):
@@ -51,10 +55,16 @@ class ApplyNode(Node):
             val += ")"
         return val
 
+    def traverse(self, tt):
+        l = self.left.traverse(tt)
+        r = self.right.traverse(tt)
+        return tt.apply(self, l, r)
+
 class FunctionNode(Node):
-    def __init__(self, name):
+    def __init__(self, bindings, to_call):
         super().__init__()
-        self.setLeft(BindingsNode(name))
+        self.setLeft(bindings)
+        self.to_call = to_call
 
     def copy(self, beta):
         new = FunctionNode(self.left.name)
@@ -69,12 +79,31 @@ class FunctionNode(Node):
     def __str__(self):
         return "L" + self.left.name + ". " + str(self.right)
 
+    def traverse(self, tt):
+        l = self.left.traverse(tt)
+        r = self.right.traverse(tt)
+        return tt.function(self, l, r)
+
+    def canInvoke(self):
+        return True
+
+    def beta_call(self, val):
+        return self.to_call(self, val)
+
 class LeafNode(Node):
     def setLeft(self, node):
         raise RuntimeError("Error: cannot give children to a leaf node.")
 
     def setRight(self, node):
         raise RuntimeError("Error: cannot give children to a leaf node.")
+
+    def expand(self, tree):
+        left = self.parent.left is self
+        if left:
+            self.parent.setLeft(tree)
+        else:
+            self.parent.setRight(tree)
+
 
 class BindingsNode(LeafNode):
     def __init__(self, name):
@@ -94,6 +123,11 @@ class BindingsNode(LeafNode):
         node.bindingNode = self
         node.bindIndex = len(self.bindings) - 1
 
+    def createBoundNode(self):
+        node = BoundNode(self)
+        self.bindings.append(node)
+        return node
+
     def bind_replace(self, node, index):
         if not isterminal(node):
             raise TypeError("Can only bind terminal nodes to a binding list")
@@ -110,6 +144,9 @@ class BindingsNode(LeafNode):
 
     def copy(self, beta):
         return beta.copyBindings(self)
+
+    def traverse(self, tt):
+        return tt.bindings(self)
 
 class TerminalNode(LeafNode):
     def __init__(self, name):
@@ -135,8 +172,44 @@ class TerminalNode(LeafNode):
     def alphaExec(self, alpha):
         alpha.renameTerminal(self)
 
+
+class BoundNode(LeafNode):
+    def __init__(self, binding):
+        super().__init__()
+        self.bindingNode = binding
+
+    def __str__(self):
+        return self.bindingNode.name
+
+    def traverse(self, tt):
+        return tt.bound(self)
+
+class UnboundNode(LeafNode):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+
+    def __str__(self):
+        return self.name + "^"
+
+    def traverse(self, tt):
+        return tt.unbound(self)
+
+class MacroNode(LeafNode):
+    def __init__(self, macro):
+        super().__init__()
+        self.macro = macro
+
+    def __str__(self):
+        return self.macro.name
+
+    def traverse(self, tt):
+        return tt.macro(self)
+
+
+
 def isterminal(node):
-    return isinstance(node, TerminalNode)
+    return isinstance(node, BoundNode) or isinstance(node, UnboundNode) or isinstance(node, MacroNode)
 
 def isleaf(node):
     return isinstance(node, LeafNode)
@@ -147,5 +220,7 @@ def isfunction(node):
 def isapply(node):
     return isinstance(node, ApplyNode)
 
+def ismacro(node):
+    return isinstance(node, MacroNode)
 
 

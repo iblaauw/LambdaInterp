@@ -5,14 +5,19 @@
 
 from tree import *
 from bindingstack import BindingStack
+from beta import createNormalLambda
 
 binder = BindingStack()
 
 def parse(instream):
-    reader = WordReader(instream)
+    #reader = WordReader(instream)
+
+    reader = TokenStream(instream)
+    reader.getNext() # advance to the first line
+
     result = do_parse(reader)
 
-    if reader.current() is not None:
+    if reader.current() is not None and result is not None:
         print("Unexpected tokens after end of expression.", reader.current())
         return None
 
@@ -72,7 +77,7 @@ def parseFunc(reader):
     if require_dot(reader) is None:
         return None
 
-    func = FunctionNode(name)
+    func = createNormalLambda(name)
 
     binder.push(func)
     body = do_parse(reader)
@@ -90,8 +95,9 @@ def parseIdentifier(reader):
     if name is None:
         return None
 
-    node = TerminalNode(name)
-    binder.try_bind(node)
+    return binder.createTerminal(name)
+    # node = TerminalNode(name)
+    # binder.try_bind(node)
 
     return node
 
@@ -110,10 +116,12 @@ def parseParens(reader):
 
 def require_name(reader):
     word = reader.current()
-    reader.getNext()
 
     if word is None:
         print("Unexpected end of file! Expecting a name.")
+        return None
+
+    reader.getNext()
 
     if word == 'L':
         print("Expected variable name. Got lambda expression.")
@@ -127,11 +135,12 @@ def require_name(reader):
 
 def require_dot(reader):
     word = reader.current()
-    reader.getNext()
 
     if word is None:
         print("Unexpected end of file! Expecting a period after lambda declaration.")
         return None
+
+    reader.getNext()
 
     if word != ".":
         print("Expecting a period. Got '{0}'.".format(word))
@@ -141,11 +150,12 @@ def require_dot(reader):
 
 def require_close_paren(reader):
     word = reader.current()
-    reader.getNext()
 
     if word is None:
         print("Unexpected end of file! Expecting a closing parenthesis.")
         return None
+
+    reader.getNext()
 
     if word != ")":
         print("Expecting a closing parenthesis. Got '{0}'.".format(word))
@@ -154,55 +164,67 @@ def require_close_paren(reader):
     return word
 
 
-_special_chars = set(['^', ':', '=', '(', ')', '.'])
+_special_chars = set(['^', ':', '=', '(', ')', '.', '\\'])
 
-class WordReader(object):
+
+class TokenStream(object):
     def __init__(self, stream):
         self.stream = stream
-        self.sent = []
+        self.line = None
         self.word = None
-        self.getNext()
 
     def current(self):
         return self.word
 
     def getNext(self):
-        while len(self.sent) <= 0:
-            line = self.stream.readline()
-            if line == '': # EOF
-                self.word = None
-                self.sent = []
-                return None
-
-            self.sent = self.doSplit(line)
-
-        self.word = self.sent[0]
-        del self.sent[0]
+        self.word = self.do_getNext()
         return self.word
 
-    def doSplit(self, line):
-        line = line.strip()
-        vals = []
+    def do_getNext(self):
+        while self.line is None or self.line == "\\":
+            self.line = self.do_readline()
+            if self.line is None:
+                return None
 
-        initial = line.split()
-        for word in initial:
-            while True:
-                flag = False
-                for i in range(len(word)):
-                    char = word[i]
-                    if char in _special_chars:
-                        if i != 0:
-                            vals.append(word[:i])
-                        vals.append(char)
-                        word = word[i+1:]
-                        flag = True
-                        break
-                if not flag:
-                    if len(word) > 0:
-                        vals.append(word)
-                    break
+        if self.line == '':
+            # Signal end of sequence, but prepare a newline for the next call
+            self.line = None
+            return None 
 
-        return vals
+        if self.line[0] == "\\":
+            print("Invalid '\\' character: a backslash must be at the end of a line.")
+            self.line = None
+            return None
 
+        if self.line[0] == "L":
+            return self._consumeFront()
+
+        for i, char in enumerate(self.line):
+            if char in _special_chars or char == ' ' or char == '\t':
+                if i == 0:
+                    assert char != ' '
+                    return self._consumeFront()
+                return self._consume(i)
+
+        # Return the entire string
+        val = self.line
+        self.line = ""
+        return val
+
+    def do_readline(self):
+        line = self.stream.readline()
+        if line == '': #EOF
+            return None
+        return line.strip()
+
+    def _consume(self, i):
+        val = self.line[:i]
+        self.line = self.line[i:].strip()
+        return val
+
+    def _consumeFront(self):
+        val = self.line[0]
+        self.line = self.line[1:].strip()
+        return val
 
 

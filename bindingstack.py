@@ -37,15 +37,31 @@ class BindingStack(object):
 
         stack.pop()
 
+    def createTerminal(self, name):
+        bindings = self._getBindings(name)
+        if bindings is None:
+            return UnboundNode(name)
+        else:
+            return bindings.createBoundNode()
 
-    def try_bind(self, node):
-        if not isterminal(node):
-            raise TypeError("Can only bind a variable with the bindings stack.")
+        # TODO: add macros here
 
-        name = node.name
+    def _getBindings(self, name):
         stack = self.bindings.get(name, None)
         if stack is None or len(stack) == 0:
-            return
+            return None
+        return stack[-1]
 
-        stack[-1].bind(node)
+
+    # def try_bind(self, node):
+    #     if not isterminal(node):
+    #         raise TypeError("Can only bind a variable with the bindings stack.")
+
+    #     name = node.name
+    #     stack = self.bindings.get(name, None)
+    #     if stack is None or len(stack) == 0:
+    #         return
+
+    #     stack[-1].bind(node)
+
 
