@@ -10,8 +10,6 @@ from beta import createNormalLambda
 binder = BindingStack()
 
 def parse(instream):
-    #reader = WordReader(instream)
-
     reader = TokenStream(instream)
     reader.getNext() # advance to the first line
 
@@ -96,10 +94,7 @@ def parseIdentifier(reader):
         return None
 
     return binder.createTerminal(name)
-    # node = TerminalNode(name)
-    # binder.try_bind(node)
 
-    return node
 
 def parseParens(reader):
     word = reader.current()

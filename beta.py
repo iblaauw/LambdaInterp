@@ -6,126 +6,6 @@ from alpha import Renamer
 class Bag(object): pass
 execute_sentinel = Bag()
 
-#class BetaExecuter(object):
-#    def __init__(self):
-#        self.binder = BindingStack()
-#        self.renamer = Renamer()
-#
-#    def run(self, tree):
-#        while True:
-#            if isapply(tree):
-#                val = self.runApply(tree)
-#            elif isfunction(tree):
-#                val = self.runFunction(tree)
-#            else:
-#                val = self.runTerminal(tree)
-#
-#            if val is execute_sentinel:
-#                tree = execute_sentinel.tree
-#            else:
-#                return val
-#
-#    def runApply(self, node):
-#        self.run(node.left)
-#
-#        if isfunction(node.left):
-#            newTree = self.execute(node)
-#            execute_sentinel.tree = newTree
-#            return execute_sentinel
-#
-#        return node
-#
-#    def runFunction(self, node):
-#        self.renamer.push(node)
-#        self.binder.push(node)
-#        self.run(node.right)
-#        self.binder.pop(node)
-#
-#        return node
-#
-#    def runTerminal(self, node):
-#        return node
-#
-#    def execute(self, applyNode):
-#        print("APPLY: ", applyNode)
-#        func = applyNode.left
-#        bindingNode = func.left
-#        bindings = bindingNode.bindings
-#        arg = applyNode.right
-#
-#        copier = BetaCopier(self.binder)
-#
-#        arg.alphaExec(self.renamer) # Do alpha reduction
-#
-#        for node in bindings:
-#            newtree = copier.run(arg)
-#            self.replace(node, newtree)
-#
-#        funcBody = func.right
-#        self.replace(applyNode, funcBody)
-#        return funcBody
-#
-#    def replace(self, original, new):
-#        parent = original.parent
-#
-#        if parent is None:
-#            return
-#
-#        isleft = parent.left is original
-#        if isleft:
-#            parent.setLeft(new)
-#        else:
-#            parent.setRight(new)
-#
-#
-#class BetaCopier(object):
-#    def __init__(self, binder):
-#        self.bindings_cache = {}
-#        self.bindings_position = {}
-#        self.binder = binder
-#
-#    def run(self, tree):
-#        return tree.copy(self)
-#
-#    def copyBindings(self, bindingNode):
-#        name = bindingNode.name
-#
-#        new = BindingsNode(name)
-#        for i in range(len(bindingNode.bindings)):
-#            node = TerminalNode(name)
-#            new.bind(node)
-#
-#        self.bindings_cache[bindingNode] = new
-#        self.bindings_position[bindingNode] = 0
-#        return new
-#
-#    def copyTerminal(self, node):
-#        assert node.bound == True
-#
-#        original_bind = node.bindingNode
-#        if original_bind not in self.bindings_cache:
-#            # This terminal is bound to a function outside the current copied body
-#            new_node = TerminalNode(node.name)
-#            if node.bindIndex == -1:
-#                original_bind.bind(new_node)
-#            else:
-#                original_bind.bind_replace(new_node, node.bindIndex)
-#                node.bindIndex = -1
-#
-#            return new_node
-#        else:
-#            new_bind = self.bindings_cache[original_bind]
-#            new_pos = self.bindings_position[original_bind]
-#
-#            val = new_bind.bindings[new_pos]
-#
-#            self.bindings_position[original_bind] += 1
-#
-#            return val
-#
-#    def try_bind(self, node):
-#        self.binder.try_bind(node)
-
 
 class BetaExecuter(object):
     def run(self, tree):
@@ -147,11 +27,16 @@ class BetaExecuter(object):
         if func is not node.left:
             node.setLeft(func)
 
-        if not func.canInvoke():
+        val = node.right
+
+        if not func.canInvoke(val):
             return node
 
-        val = node.right
         result = func.beta_call(val)
+
+        # Now delete the previous tree
+        BetaDeleter().run(val)
+
         execute_sentinel.tree = result
         return execute_sentinel
 
@@ -164,9 +49,13 @@ class BetaExecuter(object):
 
 
 class BetaCopier(object):
-    def run(self, tree):
+    def __init__(self, tree):
         self.bindings_cache = {}
-        return tree.traverse(self)
+        self.tree = tree
+
+    def copy(self):
+        self.bindings_cache = {}
+        return self.tree.traverse(self)
 
     def apply(self, node, l, r):
         new = ApplyNode()
@@ -186,7 +75,10 @@ class BetaCopier(object):
 
     def bound(self, node):
         old = node.bindingNode
-        new = self.bindings_cache[old]
+        if old in self.bindings_cache:
+            new = self.bindings_cache[old]
+        else:
+            new = old
         return new.createBoundNode()
 
     def unbound(self, node):
@@ -195,12 +87,34 @@ class BetaCopier(object):
     def macro(self, node):
         return MacroNode(node.macro)
 
+class BetaDeleter(object):
+    def run(self, tree):
+        self.inner_bindings = set()
+        tree.traverse(self)
+
+    def apply(self, node, l, r): pass
+
+    def function(self, node, l, r): pass
+
+    def bindings(self, node): 
+        self.inner_bindings.add(node)
+
+    def bound(self, node):
+        bind = node.bindingNode
+        if bind not in self.inner_bindings:
+            bind.delete(node)
+            node.bindingNode = None
+
+    def unbound(self, node): pass
+
+    def macro(self, node): pass
+
 def _betaLambdaCaller(func_node, val_node):
     bindings = func_node.left
-    copier = BetaCopier()
+    copier = BetaCopier(val_node)
 
     for terminal in bindings.bindings:
-        new_copy = copier.run(val_node)
+        new_copy = copier.copy()
         terminal.expand(new_copy)
 
     return func_node.right

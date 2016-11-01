@@ -17,25 +17,13 @@ class Node(object):
         self.right = node
         node.parent = self
 
-    def canInvoke(self):
+    def canInvoke(self, val):
         return False
-
-    def alphaExec(self, alpha):
-        self.left.alphaExec(alpha)
-        self.left.alphaExec(alpha)
 
 
 class ApplyNode(Node):
     def __init__(self):
         super().__init__()
-
-    def copy(self, beta):
-        newval = ApplyNode()
-        left = self.left.copy(beta)
-        right = self.right.copy(beta)
-        newval.setLeft(left)
-        newval.setRight(right)
-        return newval
 
     def __str__(self):
         paren_l = isfunction(self.left)
@@ -66,16 +54,6 @@ class FunctionNode(Node):
         self.setLeft(bindings)
         self.to_call = to_call
 
-    def copy(self, beta):
-        new = FunctionNode(self.left.name)
-        new.setLeft(self.left.copy(beta))
-        new.setRight(self.right.copy(beta))
-        return new
-
-    def alphaExec(self, alpha):
-        alpha.renameFunc(self)
-        self.right.alphaExec(alpha)
-
     def __str__(self):
         return "L" + self.left.name + ". " + str(self.right)
 
@@ -84,7 +62,7 @@ class FunctionNode(Node):
         r = self.right.traverse(tt)
         return tt.function(self, l, r)
 
-    def canInvoke(self):
+    def canInvoke(self, val):
         return True
 
     def beta_call(self, val):
@@ -114,64 +92,20 @@ class BindingsNode(LeafNode):
     def __getitem__(self, index):
         return self.bindings[index]
 
-    def bind(self, node):
-        if not isterminal(node):
-            raise TypeError("Can only append terminal nodes to a binding list")
-        assert node.name == self.name
-        self.bindings.append(node)
-        node.bound = True
-        node.bindingNode = self
-        node.bindIndex = len(self.bindings) - 1
-
     def createBoundNode(self):
         node = BoundNode(self)
         self.bindings.append(node)
         return node
 
-    def bind_replace(self, node, index):
-        if not isterminal(node):
-            raise TypeError("Can only bind terminal nodes to a binding list")
-        assert node.name == self.name
-        self.bindings[index] = node
-        node.bound = True
-        node.bindingNode = self
-        node.bindIndex = index
+    def delete(self, node):
+        self.bindings.remove(node)
+
 
     def rename(self, newname):
         self.name = newname
-        for node in self.bindings:
-            node.name = newname
-
-    def copy(self, beta):
-        return beta.copyBindings(self)
 
     def traverse(self, tt):
         return tt.bindings(self)
-
-class TerminalNode(LeafNode):
-    def __init__(self, name):
-        super().__init__()
-        self.name = name
-        self.bound = False
-        self.bindingNode = None
-        self.bindIndex = -1
-
-    def __str__(self):
-        if not self.bound:
-            return self.name + "^"
-        return self.name
-
-    def copy(self, beta):
-        if self.bound:
-            return beta.copyTerminal(self)
-        else:
-            new = TerminalNode(self.name)
-            beta.try_bind(new)
-            return new
-
-    def alphaExec(self, alpha):
-        alpha.renameTerminal(self)
-
 
 class BoundNode(LeafNode):
     def __init__(self, binding):
