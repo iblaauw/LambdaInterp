@@ -17,6 +17,9 @@ class Node(object):
         self.right = node
         node.parent = self
 
+    def alphaExec(self, alpha):
+        self.left.alphaExec(alpha)
+        self.left.alphaExec(alpha)
 
 class ApplyNode(Node):
     def __init__(self):
@@ -59,6 +62,10 @@ class FunctionNode(Node):
         new.setRight(self.right.copy(beta))
         return new
 
+    def alphaExec(self, alpha):
+        alpha.renameFunc(self)
+        self.right.alphaExec(alpha)
+
     def __str__(self):
         return "L" + self.left.name + ". " + str(self.right)
 
@@ -85,6 +92,16 @@ class BindingsNode(LeafNode):
         self.bindings.append(node)
         node.bound = True
         node.bindingNode = self
+        node.bindIndex = len(self.bindings) - 1
+
+    def bind_replace(self, node, index):
+        if not isterminal(node):
+            raise TypeError("Can only bind terminal nodes to a binding list")
+        assert node.name == self.name
+        self.bindings[index] = node
+        node.bound = True
+        node.bindingNode = self
+        node.bindIndex = index
 
     def rename(self, newname):
         self.name = newname
@@ -100,6 +117,7 @@ class TerminalNode(LeafNode):
         self.name = name
         self.bound = False
         self.bindingNode = None
+        self.bindIndex = -1
 
     def __str__(self):
         if not self.bound:
@@ -113,6 +131,9 @@ class TerminalNode(LeafNode):
             new = TerminalNode(self.name)
             beta.try_bind(new)
             return new
+
+    def alphaExec(self, alpha):
+        alpha.renameTerminal(self)
 
 def isterminal(node):
     return isinstance(node, TerminalNode)
