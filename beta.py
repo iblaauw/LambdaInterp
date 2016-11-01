@@ -1,7 +1,7 @@
 
 from tree import *
 from bindingstack import BindingStack
-from alpha import Renamer
+import alpha
 
 class Bag(object): pass
 execute_sentinel = Bag()
@@ -9,6 +9,10 @@ execute_sentinel = Bag()
 
 class BetaExecuter(object):
     def run(self, tree):
+        self.names = alpha.get_top_cache(tree)
+        return self.do_run(tree)
+
+    def do_run(self, tree):
         while True:
             if isapply(tree):
                result = self.runApply(tree)
@@ -23,7 +27,7 @@ class BetaExecuter(object):
                 return tree
 
     def runApply(self, node):
-        func = self.run(node.left)
+        func = self.do_run(node.left)
         if func is not node.left:
             node.setLeft(func)
 
@@ -31,6 +35,8 @@ class BetaExecuter(object):
 
         if not func.canInvoke(val):
             return node
+
+        alpha.alphaReduce(func, val, self.names)
 
         result = func.beta_call(val)
 
@@ -41,7 +47,7 @@ class BetaExecuter(object):
         return execute_sentinel
 
     def runFunction(self, node):
-        result = self.run(node.right)
+        result = self.do_run(node.right)
         if result is not node.right:
             node.setRight(result)
         return node

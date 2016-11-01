@@ -158,3 +158,16 @@ def ismacro(node):
     return isinstance(node, MacroNode)
 
 
+class TraverseBase(object):
+    def apply(self, node, l, r): pass
+
+    def function(self, node, l, r): pass
+
+    def bindings(self, node): pass
+
+    def bound(self, node): pass
+
+    def unbound(self, node): pass
+
+    def macro(self, node): pass
+
